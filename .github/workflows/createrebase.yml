@@ -22,8 +22,35 @@ env:
     )
 
 jobs:
+  get_commits:
+
+    runs-on: ubuntu-latest
+
+    outputs:
+      commits: ${{ steps.get_commits.outputs.commits }}
+
+    steps:
+      - name: Get commits via API
+        id: get_commits
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          commits=$(curl --request GET --url "https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.number }}/commits" --header "X-GitHub-Api-Version: 2022-11-28" --header "Authorization: Bearer $GITHUB_TOKEN" --silent | jq -c '[.[] | {id: .sha}]')
+          echo "commits=$commits" >> $GITHUB_OUTPUT
+
+
+  license_search:
+    needs: [get_commits]
+    uses: ./.github/workflows/licensesearch.yml
+    secrets: inherit
+    with:
+      commits: ${{ needs.get_commits.outputs.commits }}
+
+
   check_conditions:
   
+    needs: [license_search]
+
     runs-on: ubuntu-latest
 
     outputs:
@@ -33,13 +60,21 @@ jobs:
       slack_email: ${{ steps.prepare_slack_msg.outputs.last_author }}
       slack_short_msg: ${{ steps.prepare_slack_msg.outputs.short_msg }}
       slack_blocks: ${{ steps.prepare_slack_msg.outputs.blocks }}
+      licenses_ok: ${{ steps.check_licenses.outputs.ok }}
       fork_ok: ${{ steps.get_fork_conditions.outputs.ok }}
       dotnet_ok: ${{ steps.check_dotnet_requirements.outputs.ok }}
       commits_ok: ${{ steps.check_commits_requirements.outputs.ok }}
     
     steps:
+      - name: Check licenses
+        id: check_licenses
+        run: |
+            OK=${{ needs.license_search.outputs.filtered_results == '' }}
+            echo "ok=$OK" >> $GITHUB_OUTPUT
+
       - name: Get fork conditions
         id: get_fork_conditions
+        if: ${{ (steps.check_licenses.outputs.ok == 'true') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
@@ -141,7 +176,7 @@ jobs:
             echo "ok=$OK" >> $GITHUB_OUTPUT
 
       - name: Prepare slack message
-        if: ${{ (steps.get_fork_conditions.outputs.ok == 'false') || (steps.check_dotnet_requirements.outputs.ok == 'false') || (steps.check_commits_requirements.outputs.ok == 'false') }}
+        if: ${{ (steps.check_licenses.outputs.ok == 'false') || (steps.get_fork_conditions.outputs.ok == 'false') || (steps.check_dotnet_requirements.outputs.ok == 'false') || (steps.check_commits_requirements.outputs.ok == 'false') }}
         id: prepare_slack_msg
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
@@ -151,13 +186,16 @@ jobs:
             SHORT_MSG=$(echo "'rebased/$FROMREF' > Requirements not met")
             echo "short_msg=$SHORT_MSG" >> $GITHUB_OUTPUT
             FIRSTBLOCK="{\"type\": \"section\", \"text\": {\"type\": \"mrkdwn\", \"text\": \":alert-beam: 'rebased/$FROMREF' not created in '${{ github.repository }}'\"}}"
-            if [[ ${{ steps.get_fork_conditions.outputs.ok }} == 'false' ]]; then
+            if [[ "${{ steps.check_licenses.outputs.ok }}" == "false" ]]; then
+                BLOCKS="[$FIRSTBLOCK, {\"type\": \"section\", \"text\": {\"type\": \"mrkdwn\", \"text\": \"Licenses detected\"}}]"
+            fi
+            if [[ "${{ steps.get_fork_conditions.outputs.ok }}" == "false" ]]; then
                 BLOCKS="[$FIRSTBLOCK, {\"type\": \"section\", \"text\": {\"type\": \"mrkdwn\", \"text\": \"Fork or iText-CI not assigned\"}}]"
             fi
             if [[ ("${{ github.repository }}" == *"dotnet") && ("${{ steps.check_dotnet_requirements.outputs.ok }}" == "false") ]]; then
                 BLOCKS="[$FIRSTBLOCK, {\"type\": \"section\", \"text\": {\"type\": \"mrkdwn\", \"text\": \".NET repo and Java branch detected\"}}]"
             fi
-            if [[ ${{ steps.check_commits_requirements.outputs.ok }} == 'false' ]]; then
+            if [[ "${{ steps.check_commits_requirements.outputs.ok }}" == "false" ]]; then
                 BLOCKS="[$FIRSTBLOCK, {\"type\": \"section\", \"text\": {\"type\": \"mrkdwn\", \"text\": \"Branch to far behind or last commit too old\"}}]"
             fi
             echo "blocks=$BLOCKS" >> $GITHUB_OUTPUT
@@ -275,7 +313,7 @@ jobs:
 
     needs: [check_conditions]
     
-    if: (needs.check_conditions.outputs.fork_ok == 'false') ||  (needs.check_conditions.outputs.dotnet_ok == 'false') || (needs.check_conditions.outputs.commits_ok == 'false')
+    if: (needs.check_conditions.outputs.licenses_ok == 'false') || (needs.check_conditions.outputs.fork_ok == 'false') || (needs.check_conditions.outputs.dotnet_ok == 'false') || (needs.check_conditions.outputs.commits_ok == 'false')
         
     uses: ./.github/workflows/sendslackmsgtopusher.yml
     secrets: inherit
@@ -284,7 +322,7 @@ jobs:
       shortmsg: ${{ needs.check_conditions.outputs.slack_short_msg }}
       blocks: ${{ needs.check_conditions.outputs.slack_blocks }}
 
-      
+
   notification_rebase_failure:
 
     needs: [create_rebased_branch]
