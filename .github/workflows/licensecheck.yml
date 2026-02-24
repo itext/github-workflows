@@ -47,7 +47,7 @@ jobs:
             LICENSE_LINES=''
             for file in ${{ steps.changed-files.outputs.changed_files }}; do
               echo "Processing '$file'..."
-              LICENSE_MATCH=$(cat $file | grep -Pzo '(<|")licensee("| )(\n|.)*(}|</licensee>)' | xargs)
+              LICENSE_MATCH=$(cat $file | grep -Pzo '(<|")licensee("| )(\n|.)*(<key>|<signature>)(\n|.)*(<key>|<signature>)(\n|.)*(}|</licensee>)' | xargs)
               if [ -z "$LICENSE_MATCH" ]; then
                 echo "...no licenses found"
               else
