@@ -1,115 +1,24 @@
-name: LicenseCheck
+name: "License Check"
 
 on:
   workflow_call:
 
 jobs:
-  check_commits:
-    if: ${{ github.event.commits != '' }}
+  licenseSearch:
+    uses: ./.github/workflows/licensesearch.yml
+    secrets: inherit
+    with:
+      commits: ${{ toJson(github.event.commits) }}
+
+  handleFoundLicenses:
+    needs: [licenseSearch]
 
     runs-on: ubuntu-latest
-
-    continue-on-error: true
-
-    strategy:
-      matrix:
-        value: ${{ github.event.commits }}
-
-    outputs:
-      license_lines: ${{ steps.process-files.outputs.license_lines }}
-
-    steps:
-      - name: Store commit
-        id: store_commit
-        run: |
-          COMMIT=${{ matrix.value.id }}
-          echo "commit=$COMMIT" >> $GITHUB_OUTPUT
-
-      - name: Checkout commit and parent commit
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-          ref: "${{ steps.store_commit.outputs.commit }}"
-
-      - name: Get changed files
-        id: changed-files
-        run: |
-            echo "Getting changed files"
-            CHANGED_FILES=$(git diff --name-only HEAD^ HEAD | xargs)
-            for file in $CHANGED_FILES; do
-                echo "'$file' was changed"
-            done
-            echo "changed_files=$CHANGED_FILES" >> $GITHUB_OUTPUT
-
-      - name: Process changed files
-        id: process-files
-        run: |
-            LICENSE_LINES=''
-            for file in ${{ steps.changed-files.outputs.changed_files }}; do
-              echo "Processing '$file'..."
-              LICENSE_MATCH=$(cat $file | grep -Pzo '(<|")licensee("| )(\n|.)*(<key>|<signature>)(\n|.)*(<key>|<signature>)(\n|.)*(}|</licensee>)' | xargs)
-              if [ -z "$LICENSE_MATCH" ]; then
-                echo "...no licenses found"
-              else
-                echo "license found!"
-                LICENSE_LINE="<$file>
-                $LICENSE_MATCH
-                "
-                LICENSE_LINES="$LICENSE_LINES
-                $LICENSE_LINE"
-              fi
-            done
-            {
-                echo 'license_lines<<EOF'
-                echo "${LICENSE_LINES}"
-                echo EOF
-            } >> $GITHUB_OUTPUT
-
-      - name: Create json with result
-        run: |
-          jq -cn  --arg commit ${{ steps.store_commit.outputs.commit }} --arg licenselines "${{ steps.process-files.outputs.license_lines }}" '$ARGS.named' > result
-
-      - name: Random Number Generator
-        id: random-number-generator
-        run: echo "random-number=$(echo $RANDOM)" >> $GITHUB_OUTPUT
-        shell: bash
-      
-      - name: Upload result
-        uses: actions/upload-artifact@v4
-        with:
-          name: "result-${{ steps.random-number-generator.outputs.random-number }}"
-          path: result
-
-
-  process_results:
-    needs: check_commits
     
-    runs-on: ubuntu-latest
-    
-    continue-on-error: true
-
-    outputs:
-      results: ${{ steps.read_results.outputs.results }}
-
     steps:
-      - name: Download results
-        uses: actions/download-artifact@v4
-
-      - name: Read results file
-        id: read_results
-        run: |
-          results="$(cat */result | jq -c --slurp .)"
-          echo results=$results >> $GITHUB_OUTPUT
-
-      - name: Filter results
-        id: filter_results
-        run: |
-          filtered_results="$(jq -n --argjson data '${{ steps.read_results.outputs.results }}' '$data[] | select(.licenselines != "")')"
-          echo filtered_results=$filtered_results >> $GITHUB_OUTPUT
-
       - name: Get number commits
         id: get_nr_commits
-        if: ${{ steps.filter_results.outputs.filtered_results != '' }}
+        if: ${{ needs.licenseSearch.outputs.filtered_results != '' }}
         env:
             commits: ${{ toJson(github.event.commits) }}
         run: |
@@ -118,7 +27,7 @@ jobs:
 
       - name: Get push type
         id: push-type
-        if: ${{ steps.filter_results.outputs.filtered_results != '' }}        
+        if: ${{ needs.licenseSearch.outputs.filtered_results != '' }}
         env: 
             COMMITCOUNT: ${{ steps.get_nr_commits.outputs.number_commits }}
         run: |
@@ -135,13 +44,13 @@ jobs:
             echo "fetch_depth=$FETCH_DEPTH" >> $GITHUB_OUTPUT
 
       - name: Checkout
-        if: ${{ steps.filter_results.outputs.filtered_results != '' }}
+        if: ${{ needs.licenseSearch.outputs.filtered_results != '' }}
         uses: actions/checkout@v4
         with:
          fetch-depth: ${{ steps.push-type.outputs.fetch_depth }}
 
       - name: Remove commits if licenses found
-        if: ${{ steps.filter_results.outputs.filtered_results != '' }}
+        if: ${{ needs.licenseSearch.outputs.filtered_results != '' }}
         id: remove-license
         run: |
             info="$(jq -n --argjson data '[${{ steps.filter_results.outputs.filtered_results }}]' '"`" + $data[].commit + "`: " + $data[].licenselines')"
@@ -166,7 +75,7 @@ jobs:
 
       - name: Find correspondences
         id: email
-        if: ${{ steps.filter_results.outputs.filtered_results != '' }}
+        if: ${{ needs.licenseSearch.outputs.filtered_results != '' }}
         uses: slackapi/slack-github-action@v2.1.1
         with:
           method: users.lookupByEmail # https://api.slack.com/methods/users.lookupByEmail
