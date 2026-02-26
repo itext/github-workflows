@@ -5,6 +5,7 @@ on:
 
 jobs:
   licenseSearch:
+    if: "!contains(toJson(github.event.commits), '[]')"
     uses: ./.github/workflows/licensesearch.yml
     secrets: inherit
     with:
