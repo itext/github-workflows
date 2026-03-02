@@ -3,6 +3,29 @@ name: CreatePR
 on:
   workflow_call:
 
+env:
+  BRANCHCONDITION: ${{ (github.ref != 'refs/heads/master') &&
+            (github.ref != 'refs/heads/develop') &&
+            (github.ref != 'refs/heads/developv2') &&
+            (github.ref != 'refs/heads/pdfxfa-master') &&
+            (github.ref != 'refs/heads/pdfxfa-develop') &&
+            (! startsWith(github.ref, 'refs/heads/rebased/')) &&
+            (! startsWith(github.ref, 'refs/heads/no-rebased/')) &&
+            (! startsWith(github.ref, 'refs/heads/archive/')) &&
+            (! startsWith(github.ref, 'refs/heads/android/')) &&
+            (! startsWith(github.ref, 'refs/heads/7.1/')) &&
+            (! startsWith(github.ref, 'refs/heads/7.2/')) &&
+            (! startsWith(github.ref, 'refs/heads/7.3/')) &&
+            (! startsWith(github.ref, 'refs/heads/8.0/')) &&
+            (! startsWith(github.ref, 'refs/heads/autoport-')) &&
+            (! startsWith(github.ref, 'refs/heads/autoport/')) &&
+            (! startsWith(github.ref, 'refs/heads/release_branch')) &&
+            (! startsWith(github.ref, 'refs/heads/after_release')) &&
+            (! startsWith(github.ref, 'refs/heads/master-rc')) &&
+            (! startsWith(github.ref, 'refs/heads/test-release')) &&
+            (! startsWith(github.ref, 'refs/heads/test-after-release')) &&
+            (! startsWith(github.ref, 'refs/heads/internal-master-rc')) }}
+
 jobs:
   create_pr:
     runs-on: ubuntu-latest
@@ -13,15 +36,20 @@ jobs:
       email: ${{ steps.get-email.outputs.email }}
       prid: ${{ steps.open-pull-request.outputs.prid }}
       failure: ${{ steps.failure_handling.outputs.failure }}
+      branchcondition: ${{ steps.branch-condition.outputs.branchcondition }}
+
 
     steps:
-      - name: Logging
+      - name: Branch condition
+        id: branch-condition
         run: |
             echo "github.ref: ${{ github.ref }}"
+            echo "BRANCHCONDITION=$BRANCHCONDITION"
+            echo "branchcondition=$BRANCHCONDITION" >> $GITHUB_OUTPUT
 
       - name: Get email
         id: get-email
-        if: ${{ ! startsWith(github.ref, 'refs/heads/rebased') }}
+        if: ${{ (steps.branch-condition.outputs.branchcondition == 'true') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}        
         run: |
@@ -30,7 +58,7 @@ jobs:
 
       - name: Open pull request
         id: open-pull-request
-        if: ${{ ! startsWith(github.ref, 'refs/heads/rebased') }}
+        if: ${{ (steps.branch-condition.outputs.branchcondition == 'true') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}        
         run: |
@@ -59,7 +87,7 @@ jobs:
   notification_success:
 
     needs: [create_pr]    
-    if: (! startsWith(github.ref, 'refs/heads/rebased')) &&  (! needs.create_pr.outputs.failure)
+    if: (needs.create_pr.outputs.branchcondition == 'true') && (! needs.create_pr.outputs.failure)
     
     uses: ./.github/workflows/sendslackmsgtopusher.yml
     secrets: inherit
@@ -72,7 +100,7 @@ jobs:
   notification_failure:
 
     needs: [create_pr]    
-    if: (! startsWith(github.ref, 'refs/heads/rebased')) &&  (needs.create_pr.outputs.failure)
+    if: (needs.create_pr.outputs.branchcondition == 'true') && (needs.create_pr.outputs.failure)
     
     uses: ./.github/workflows/sendslackmsgtopusher.yml
     secrets: inherit
