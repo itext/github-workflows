@@ -22,7 +22,27 @@ env:
     )
 
 jobs:
+  wait_previous_run:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get Previous Run
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          previousRunRunning=$(curl --request GET --url "https://api.github.com/repos/${{ github.repository }}/actions/workflows/createrebase.yml/runs" --header "X-GitHub-Api-Version: 2022-11-28" --header "Authorization: Bearer $GITHUB_TOKEN" --silent | jq '.workflow_runs | .[] | select(.head_branch == "${{ github.head_ref }}") | select(.status == "in_progress") | select(.id < ${{ github.run_id }}) | {id: .id, branch: .head_branch, status: .status}')
+          while [[ $previousRunRunning != "" ]];
+          do
+            echo "previous run found - waiting 10 seconds....:"
+            echo "$previousRunRunning"
+            sleep 10
+            previousRunRunning=$(curl --request GET --url "https://api.github.com/repos/${{ github.repository }}/actions/workflows/createrebase.yml/runs" --header "X-GitHub-Api-Version: 2022-11-28" --header "Authorization: Bearer $GITHUB_TOKEN" --silent | jq '.workflow_runs | .[] | select(.head_branch == "${{ github.head_ref }}") | select(.status == "in_progress") | select(.id < ${{ github.run_id }}) | {id: .id, branch: .head_branch, status: .status}')
+          done
+
   get_commits:
+
+    needs: [wait_previous_run]
 
     runs-on: ubuntu-latest
 
@@ -202,6 +222,8 @@ jobs:
 
 
   delete_rebased_branch:
+
+    needs: [wait_previous_run]
 
     runs-on: ubuntu-latest
 
