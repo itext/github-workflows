@@ -212,6 +212,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           echo "delete branch 'rebased/$FROMREF'"
+          echo "https://api.github.com/repos/${{ github.repository }}/git/refs/heads/rebased/$FROMREF"
           curl --request DELETE --url "https://api.github.com/repos/${{ github.repository }}/git/refs/heads/rebased/$FROMREF" --header "X-GitHub-Api-Version: 2022-11-28" --header "Authorization: Bearer $GITHUB_TOKEN" --silent
   
 
@@ -283,7 +284,7 @@ jobs:
 
       - name: Push rebased branch to remote
         run: |
-            git push origin rebased/$FROMREF
+            git push origin rebased/$FROMREF --force
 
       - name: Set git notes
         id: gitnotes
