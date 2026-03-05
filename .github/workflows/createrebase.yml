@@ -289,7 +289,7 @@ jobs:
         id: gitnotes
         run: |
             git fetch origin refs/notes/*:refs/notes/*
-            git notes add -f -m 'CREATED_BY: PR-${{ github.event.pull_request.id }}'
+            git notes add -f -m 'CREATED_BY: PR-${{ github.event.number }}'
             git push origin refs/notes/*
 
       - name: Failure handling
