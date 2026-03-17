@@ -20,6 +20,16 @@ env:
         XodoDocs/itext-functional-tests-dotnet
         XodoDocs/itext-publications-samples-dotnet
     )
+  LICENSES_ALLOWED_REPOS: (
+        XodoDocs/itext-sdk-profiling-java
+        XodoDocs/itext-sdk-profiling-dotnet
+        XodoDocs/itext-licensekey-java
+        XodoDocs/itext-licensekey-dotnet
+        XodoDocs/itext-licensekey-volume-java
+        XodoDocs/itext-licensekey-volume-dotnet
+        XodoDocs/itext-licensekey-creation
+        XodoDocs/itext-licensekey-generation-service
+    )
 
 jobs:
   wait_previous_run:
@@ -89,7 +99,11 @@ jobs:
       - name: Check licenses
         id: check_licenses
         run: |
-            OK=${{ needs.license_search.outputs.filtered_results == '' }}
+            if [[ " ${LICENSES_ALLOWED_REPOS[*]} " =~ [[:space:]]${{ github.repository }}[[:space:]] ]]; then
+                OK=${{ true }}
+            else
+                OK=${{ needs.license_search.outputs.filtered_results == '' }}
+            fi
             echo "ok=$OK" >> $GITHUB_OUTPUT
 
       - name: Get fork conditions
