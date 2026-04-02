@@ -133,7 +133,7 @@ jobs:
             echo "ok=$OK" >> $GITHUB_OUTPUT
 
       - name: Check .NET repo requirements
-        if: ${{ (steps.get_fork_conditions.outputs.ok == 'true') && contains(github.repository, 'dotnet') }}
+        if: ${{ (steps.get_fork_conditions.outputs.ok == 'true') && (contains(github.repository, 'dotnet') || contains(github.repository, 'nuget')) }}
         id: check_dotnet_requirements
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
@@ -202,6 +202,10 @@ jobs:
             if [[ "${{ github.repository }}" == *"dotnet" ]]; then
                 ISDOTNETREPO=${{ true }}
                 MATCHINGJAVAREPO=${{ steps.check_dotnet_requirements.outputs.matchingjavarepo }}
+            else
+                if [[ "${{ github.repository }}" == *"nuget"* ]]; then
+                    ISDOTNETREPO=${{ true }}
+                fi
             fi
             echo "isdotnetrepo=$ISDOTNETREPO"
             echo "matchingjavarepo=$MATCHINGJAVAREPO"
