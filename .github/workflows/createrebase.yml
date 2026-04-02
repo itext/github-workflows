@@ -30,6 +30,18 @@ env:
         XodoDocs/itext-licensekey-creation
         XodoDocs/itext-licensekey-generation-service
     )
+  COPYRIGHT_REPOS: (
+        XodoDocs/itext-sdk-core-java
+        XodoDocs/itext-sdk-core-dotnet
+        XodoDocs/itext-sdk-cleanup-java
+        XodoDocs/itext-sdk-cleanup-dotnet
+        XodoDocs/itext-sdk-html2pdf-java
+        XodoDocs/itext-sdk-html2pdf-dotnet
+        XodoDocs/itext-sdk-pdfocr-java
+        XodoDocs/itext-sdk-pdfocr-dotnet
+        itext/itext-eu-trusted-lists-resources
+        itext/rups        
+    )
 
 jobs:
   wait_previous_run:
@@ -308,18 +320,23 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}      
         run: |
-          if ${{ needs.check_conditions.outputs.isdotnetrepo == 'true'}}; then
-            if ${{ needs.check_conditions.outputs.matchingjavarepo == ''}}; then
-                groovy InspectHeaders.groovy
-                git add '**/*.cs'
+          if [[ " ${COPYRIGHT_REPOS[*]} " =~ [[:space:]]${{ github.repository }}[[:space:]] ]]; then
+            echo "Run InspectHeaders and add changes"
+            if ${{ needs.check_conditions.outputs.isdotnetrepo == 'true'}}; then
+                if ${{ needs.check_conditions.outputs.matchingjavarepo == ''}}; then
+                    groovy InspectHeaders.groovy
+                    git add '**/*.cs'
+                else
+                    curl --request GET --url "https://api.github.com/repos/${{ needs.check_conditions.outputs.matchingjavarepo }}/contents/sharpenConfiguration.xml?ref=develop" --header "Authorization: Bearer $GITHUB_TOKEN" --header "X-GitHub-Api-Version: 2022-11-28" --silent | python3 -c "import sys, json; print(json.load(sys.stdin)['content'])" | base64 --decode | grep '<file path' | grep '.java' | sed -e 's/<file path=\"com\/itextpdf\//**\//g' -e 's/\"//g' -e 's/\/>//g' -e 's/java/cs/g' -e 's/\s\+//g' > inclusionFile.txt
+                    groovy InspectHeaders.groovy -i inclusionFile.txt
+                    git add '**/*.cs'
+                fi
             else
-                curl --request GET --url "https://api.github.com/repos/${{ needs.check_conditions.outputs.matchingjavarepo }}/contents/sharpenConfiguration.xml?ref=develop" --header "Authorization: Bearer $GITHUB_TOKEN" --header "X-GitHub-Api-Version: 2022-11-28" --silent | python3 -c "import sys, json; print(json.load(sys.stdin)['content'])" | base64 --decode | grep '<file path' | grep '.java' | sed -e 's/<file path=\"com\/itextpdf\//**\//g' -e 's/\"//g' -e 's/\/>//g' -e 's/java/cs/g' -e 's/\s\+//g' > inclusionFile.txt
-                groovy InspectHeaders.groovy -i inclusionFile.txt
-                git add '**/*.cs'
+                groovy InspectHeaders.groovy
+                git add './**/*.java'
             fi
           else
-            groovy InspectHeaders.groovy
-            git add './**/*.java'
+            echo "skip copyright headers"
           fi
 
       - name: Push rebased branch to remote
