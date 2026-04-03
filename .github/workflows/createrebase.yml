@@ -18,7 +18,7 @@ env:
         XodoDocs/itext-sdk-pdfocr-dotnet
         XodoDocs/itext-sdk-cross-module-tests-dotnet
         XodoDocs/itext-functional-tests-dotnet
-        XodoDocs/itext-publications-samples-dotnet
+        XodoDocs/itext-sdk-profiling-dotnet
     )
   LICENSES_ALLOWED_REPOS: (
         XodoDocs/itext-sdk-profiling-java
