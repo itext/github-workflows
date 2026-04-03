@@ -29,6 +29,8 @@ env:
         XodoDocs/itext-licensekey-volume-dotnet
         XodoDocs/itext-licensekey-creation
         XodoDocs/itext-licensekey-generation-service
+        XodoDocs/itext-sdk-cross-module-tests-java
+        XodoDocs/itext-sdk-cross-module-tests-dotnet
     )
   COPYRIGHT_REPOS: (
         XodoDocs/itext-sdk-core-java
