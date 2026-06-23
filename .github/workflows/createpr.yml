@@ -24,6 +24,7 @@ env:
             (! startsWith(github.ref, 'refs/heads/master-rc')) &&
             (! startsWith(github.ref, 'refs/heads/test-release')) &&
             (! startsWith(github.ref, 'refs/heads/test-after-release')) &&
+            (! startsWith(github.ref, 'refs/heads/test-after_release')) &&
             (! startsWith(github.ref, 'refs/heads/internal-master-rc')) }}
 
 jobs:
