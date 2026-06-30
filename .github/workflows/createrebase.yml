@@ -337,6 +337,11 @@ jobs:
                 groovy InspectHeaders.groovy
                 git add './**/*.java'
             fi
+            if ! git diff --cached --quiet; then
+                git commit -m "Add missing copyright headers"
+            else
+                echo "No changes to commit"
+            fi
           else
             echo "skip copyright headers"
           fi
