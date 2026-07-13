@@ -136,8 +136,8 @@ jobs:
                 echo "Pullrequest assigned to iText-CI"
                 CI_ASSIGNED=${{ true }}
             fi
-            if [[ ($FORK == ${{ true }}) && ($CI_ASSIGNED == ${{ true }}) ]]; then
-                echo "Pullrequest for a fork and iText-CI assigned > unassign iText-CI"
+            if [[ $CI_ASSIGNED == ${{ true }} ]]; then
+                echo "iText-CI assigned > unassign iText-CI"
                 curl --request DELETE --url "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.number }}/assignees" --header "X-GitHub-Api-Version: 2022-11-28" --header "Authorization: Bearer $GITHUB_TOKEN" --silent -d '{"assignees":["iText-CI"]}'
             fi
             OK=${{ false }}
