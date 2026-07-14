@@ -353,9 +353,34 @@ jobs:
       - name: Set git notes
         id: gitnotes
         run: |
-            git fetch origin refs/notes/*:refs/notes/*
-            git notes add -f -m 'CREATED_BY: PR-${{ github.event.number }}'
-            git push origin refs/notes/*
+            MAX_RETRIES=5
+            RETRY_COUNT=0
+            
+            while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+                echo "Attempt $((RETRY_COUNT + 1))/$MAX_RETRIES: Fetching and pushing git notes..."
+                
+                # Fetch latest notes from remote
+                git fetch origin refs/notes/*:refs/notes/* || true
+                
+                # Add the note
+                git notes add -f -m 'CREATED_BY: PR-${{ github.event.number }}'
+                
+                # Try to push notes
+                if git push origin refs/notes/*; then
+                    echo "✓ Successfully pushed git notes"
+                    exit 0
+                fi
+                
+                RETRY_COUNT=$((RETRY_COUNT + 1))
+                if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                    WAIT_TIME=$((2 ** RETRY_COUNT))
+                    echo "Push failed. Retrying in ${WAIT_TIME}s... (Attempt $RETRY_COUNT/$MAX_RETRIES)"
+                    sleep $WAIT_TIME
+                fi
+            done
+            
+            echo "✗ Failed to push git notes after $MAX_RETRIES attempts"
+            exit 1
 
       - name: Failure handling
         if: failure()
